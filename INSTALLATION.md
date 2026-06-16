@@ -67,14 +67,25 @@ This command will:
 
 ## Running the Application
 
+### Changing the Default Port
+By default, the application is configured to run on port `3000`. Since you are installing it on port `3434`, you will need to open `server.ts` before building, and change line 18:
+```typescript
+// Change this:
+const PORT = 3000;
+
+// To this:
+const PORT = 3434;
+```
+*(Alternatively, you can leave the application running on port `3000` and use Nginx to map port `3434` to it, as shown in the Nginx section).*
+
 ### Option A: Running Manually (Testing)
 
-You can test that the application starts completely by running the production start script.
+You can test that the application starts up correctly by running the production start script:
 
 ```bash
 npm run start
 ```
-*Note: The server will run on port 3000 by default. Press `Ctrl+C` to stop it.*
+*Note: The server will start and output the port it's running on. Press `Ctrl+C` to stop it.*
 
 ### Option B: Running in the Background (Recommended for Production)
 
@@ -91,28 +102,26 @@ To keep the application running even after you disconnect from the server termin
    pm2 startup
    ```
 
-3. Some useful PM2 commands:
-   - View logs: `pm2 logs nexusftp-app`
-   - Stop app: `pm2 stop nexusftp-app`
-   - Restart app: `pm2 restart nexusftp-app`
-
 ---
 
-## Setting up a Reverse Proxy (Optional but Recommended)
+## Setting up a Reverse Proxy for `iftp.xus.me`
 
-By default, the Express server listens on Port `3000`. To access your app via a standard web port (`80` for HTTP or `443` for HTTPS) or a domain name, you should set up a reverse proxy like Nginx or Apache.
+To access your app via your domain (`iftp.xus.me`) using a standard web port (`80`/`443`) or your custom port (`3434`), you should set up a reverse proxy like Nginx.
 
-### Example Nginx Configuration
+### Nginx Configuration
 
-Create a new configuration block in `/etc/nginx/sites-available/your-domain.com`:
+Create a new configuration block in `/etc/nginx/sites-available/iftp.xus.me`:
 
 ```nginx
 server {
-    listen 80;
-    server_name your-domain.com www.your-domain.com;
+    # If the proxy itself needs to listen on 3434, use: listen 3434;
+    # Otherwise, for standard HTTP, use: listen 80;
+    listen 80; 
+    server_name iftp.xus.me;
 
     location / {
-        proxy_pass http://localhost:3000;
+        # Ensure this matches the port your Node app is running on (3434 or 3000)
+        proxy_pass http://localhost:3434;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -122,10 +131,10 @@ server {
 }
 ```
 
-Enable it and restart Nginx:
+Enable your domain configuration and restart Nginx:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/your-domain.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/iftp.xus.me /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
