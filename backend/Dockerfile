@@ -13,8 +13,8 @@ RUN apk add --no-cache python3 make g++ openssl-dev
 # Copy dependency files
 COPY package.json package-lock.json ./
 
-# Install production dependencies only
-RUN npm ci --omit=dev && npm cache clean --force
+# Install all dependencies for build
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY tsconfig.json ./
@@ -24,7 +24,8 @@ COPY src/ ./src/
 RUN npm run build
 
 # Remove dev dependencies and build tools
-RUN apk del python3 make g++ && \
+RUN npm prune --omit=dev && \
+    apk del python3 make g++ && \
     rm -rf /root/.npm /tmp/*
 
 # Create data and log directories
