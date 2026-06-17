@@ -14,9 +14,10 @@ interface ContextMenuType {
   isLocal: boolean;
   onClose: () => void;
   target?: string; // name
+  onAction?: (action: string) => void;
 }
 
-export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMenuType) {
+export default function ContextMenu({ pos, isLocal, target, onClose, onAction }: ContextMenuType) {
   const ref = useRef<HTMLDivElement>(null);
   const { selectedLocalFiles, selectedRemoteFiles } = useStore();
   const [mounted, setMounted] = useState(false);
@@ -60,27 +61,27 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
 
         {target && !isMulti && (
           <>
-            <MenuItem icon={<Download size={15}/>} label="Download" shortcut="Cmd D" />
-            <MenuItem icon={<Edit2 size={15}/>} label="Rename" shortcut="Enter" />
+            <MenuItem icon={<Download size={15}/>} label="Download" shortcut="Cmd D" onClick={() => onAction?.('download')} />
+            <MenuItem icon={<Edit2 size={15}/>} label="Rename" shortcut="Enter" onClick={() => onAction?.('rename')} />
             <div className="h-px bg-white/10 my-1 mx-2" />
-            <MenuItem icon={<Scissors size={15}/>} label="Cut" shortcut="Cmd X" />
-            <MenuItem icon={<Copy size={15}/>} label="Copy" shortcut="Cmd C" />
+            <MenuItem icon={<Scissors size={15}/>} label="Cut" shortcut="Cmd X" onClick={() => onAction?.('cut')} />
+            <MenuItem icon={<Copy size={15}/>} label="Copy" shortcut="Cmd C" onClick={() => onAction?.('copy')} />
           </>
         )}
         
         {target && isMulti && (
           <>
-            <MenuItem icon={<Download size={15}/>} label="Download Selected" />
-            <MenuItem icon={<Copy size={15}/>} label="Copy Selected" />
+            <MenuItem icon={<Download size={15}/>} label="Download Selected" onClick={() => onAction?.('download')} />
+            <MenuItem icon={<Copy size={15}/>} label="Copy Selected" onClick={() => onAction?.('copy')} />
           </>
         )}
 
         {!target && (
            <>
-             <MenuItem icon={<FolderPlus size={15}/>} label="New Folder" shortcut="Cmd N" />
-             <MenuItem icon={<FilePlus size={15}/>} label="New File" />
+             <MenuItem icon={<FolderPlus size={15}/>} label="New Folder" shortcut="Cmd N" onClick={() => onAction?.('new-folder')} />
+             <MenuItem icon={<FilePlus size={15}/>} label="New File" onClick={() => onAction?.('new-file')} />
              <div className="h-px bg-white/10 my-1 mx-2" />
-             <MenuItem icon={<ClipboardPaste size={15}/>} label="Paste" shortcut="Cmd V" disabled />
+             <MenuItem icon={<ClipboardPaste size={15}/>} label="Paste" shortcut="Cmd V" disabled={!useStore.getState().clipboard} onClick={() => onAction?.('paste')} />
            </>
         )}
 
@@ -92,13 +93,14 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
             label="Delete" 
             shortcut="Backspace" 
             danger 
+            onClick={() => onAction?.('delete')}
           />
         )}
         
         {target && !isMulti && (
           <>
             <div className="h-px bg-white/10 my-1 mx-2" />
-            <MenuItem icon={<Info size={15}/>} label="Properties" />
+            <MenuItem icon={<Info size={15}/>} label="Properties" onClick={() => onAction?.('properties')} />
           </>
         )}
         
@@ -110,10 +112,13 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
   return createPortal(menuContent, document.body);
 }
 
-function MenuItem({ icon, label, shortcut, danger, disabled }: any) {
+function MenuItem({ icon, label, shortcut, danger, disabled, onClick }: any) {
   return (
     <button 
       disabled={disabled}
+      onClick={() => {
+        if (!disabled && onClick) onClick();
+      }}
       className={`w-full flex items-center justify-between px-3 py-1.5 text-sm transition-colors mx-1 rounded-md max-w-[calc(100%-8px)]
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/10'}
         ${danger ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300' : 'text-[#E0E0E6] hover:text-white'}

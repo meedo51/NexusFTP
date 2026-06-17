@@ -64,6 +64,104 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
      setContextMenu({ pos: { x: e.clientX, y: e.clientY }, target: targetName });
   };
 
+  const handleAction = async (action: string) => {
+    setContextMenu(null);
+    const targetId = activeConnectionId || 'local'; // Wait, let's use the actual side connection
+    const currentPath = path;
+    const cid = isLocal ? 'local' : (activeConnectionId || 'local');
+
+    if (action === 'download') {
+      for (const itemName of selected) {
+        window.open(`/api/files/download?id=${cid}&path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(itemName)}`);
+      }
+    } else if (action === 'delete') {
+      const itemsToDelete = files.filter(f => selected.includes(f.name)).map(f => ({ path: currentPath, name: f.name, type: f.type }));
+      await fetch('/api/files/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cid, items: itemsToDelete })
+      });
+      onRefresh();
+    } else if (action === 'copy' || action === 'cut') {
+      const itemsToCopy = files.filter(f => selected.includes(f.name));
+      useStore.getState().setClipboard({
+        type: action as 'copy' | 'cut',
+        items: itemsToCopy,
+        sourcePath: currentPath,
+        sourceType: isLocal ? 'local' : 'remote'
+      });
+    } else if (action === 'paste') {
+      const clipboard = useStore.getState().clipboard;
+      if (!clipboard) return;
+      
+      // Simple copy implementation (assumes server endpoint supports cross-environment or same-environment)
+      // Note: for now our copy endpoint only works on the same side.
+      if (clipboard.sourceType === (isLocal ? 'local' : 'remote')) {
+         await fetch('/api/files/copy', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+             id: cid,
+             items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })),
+             destPath: currentPath
+           })
+         });
+         
+         if (clipboard.type === 'cut') {
+           await fetch('/api/files/delete', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ id: cid, items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })) })
+           });
+           useStore.getState().setClipboard(null);
+         }
+         onRefresh();
+      } else {
+         alert("Cross-environment copy/paste is not implemented via this menu yet. Drag and Drop instead.");
+      }
+    } else if (action === 'new-folder') {
+      const name = prompt("Enter folder name:");
+      if (name) {
+         await fetch('/api/files/create', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ id: cid, path: currentPath, type: 'folder', name })
+         });
+         onRefresh();
+      }
+    } else if (action === 'new-file') {
+      const name = prompt("Enter file name:");
+      if (name) {
+         await fetch('/api/files/create', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ id: cid, path: currentPath, type: 'file', name })
+         });
+         onRefresh();
+      }
+    } else if (action === 'rename') {
+      if (selected.length === 1) {
+        const oldName = selected[0];
+        const newName = prompt("Enter new name:", oldName);
+        if (newName && newName !== oldName) {
+           await fetch('/api/files/rename', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ id: cid, path: currentPath, oldName, newName })
+           });
+           onRefresh();
+        }
+      }
+    } else if (action === 'properties') {
+      if (selected.length === 1) {
+        const file = files.find(f => f.name === selected[0]);
+        if (file) {
+          alert(`Name: ${file.name}\nType: ${file.type}\nSize: ${formatBytes(file.size, 2)}\nModified: ${format(new Date(file.modifyTime), 'PPpp')}\nPermissions: ${file.permissions}\nOwner: ${file.owner}`);
+        }
+      }
+    }
+  };
+
   // Sorted: folders first, then files, alphabetically
   const sortedFiles = [...files].sort((a, b) => {
      if (a.type === 'dir' && b.type === 'file') return -1;
@@ -243,6 +341,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
            isLocal={isLocal} 
            target={contextMenu.target} 
            onClose={() => setContextMenu(null)} 
+           onAction={handleAction}
          />
        )}
 

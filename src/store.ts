@@ -28,6 +28,13 @@ export interface FileItem {
   group: string;
 }
 
+export interface ClipboardData {
+  type: 'copy' | 'cut';
+  items: FileItem[];
+  sourcePath: string;
+  sourceType: 'local' | 'remote';
+}
+
 export interface Transfer {
   id: string;
   filename: string;
@@ -63,6 +70,9 @@ interface AppState {
   transfers: Transfer[];
   
   theme: 'dark' | 'light' | 'system';
+  
+  clipboard: ClipboardData | null;
+  setClipboard: (data: ClipboardData | null) => void;
   
   // Actions
   addConnection: (conn: ConnectionConfig) => void;
@@ -116,6 +126,9 @@ export const useStore = create<AppState>()(
       transfers: [],
       
       theme: 'dark',
+      
+      clipboard: null,
+      setClipboard: (data) => set({ clipboard: data }),
       
       addConnection: (conn) => set((state) => ({ connections: [...state.connections, conn] })),
       updateConnection: (id, partial) => set((state) => ({

@@ -225,6 +225,63 @@ app.post('/api/files/delete', async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/files/rename', async (req, res) => {
+  const { id, path: dirPath, oldName, newName } = req.body;
+  const conn = activeConnections.get(id);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const oldPath = path.resolve(dirPath || process.cwd(), oldName);
+      const newPath = path.resolve(dirPath || process.cwd(), newName);
+      await fs.promises.rename(oldPath, newPath);
+      return res.json({ success: true });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+  return res.json({ success: true });
+});
+
+app.post('/api/files/copy', async (req, res) => {
+  const { id, items, destPath } = req.body; // items: { path, name, type }[]
+  const conn = activeConnections.get(id);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      for (const item of items) {
+        const srcPath = path.resolve(item.path, item.name);
+        const dest = path.resolve(destPath || process.cwd(), item.name);
+        if (item.type === 'dir') {
+          await fs.promises.cp(srcPath, dest, { recursive: true });
+        } else {
+          await fs.promises.copyFile(srcPath, dest);
+        }
+      }
+      return res.json({ success: true });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+  return res.json({ success: true });
+});
+
+app.get('/api/files/download', async (req, res) => {
+  const { id, path: dirPath, name } = req.query;
+  const conn = activeConnections.get(id as string);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const resolvedPath = path.resolve((dirPath as string) || process.cwd(), name as string);
+      return res.download(resolvedPath, name as string);
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // For keeping it scoped, and since standard Vite setup applies, start Vite below:
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
