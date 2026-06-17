@@ -1,31 +1,27 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useStore } from '../store';
+import { apiClient } from '../lib/api';
 import FilePanel from './FilePanel';
 import { PanelLeft, PanelRight, Columns } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function FileBrowser() {
-  const { isConnected, activeConnectionId, setLocalFiles, setRemoteFiles, localPath, remotePath, layoutMode, setLayoutMode } = useStore();
+  const { isConnected, activeConnectionId, setLocalFiles, setRemoteFiles, localPath, remotePath, layoutMode, setLayoutMode, addNotification } = useStore();
 
-  const fetchFiles = async (isLocal: boolean) => {
+  const fetchFiles = useCallback(async (isLocal: boolean) => {
     try {
-      const res = await fetch('/api/files', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: isLocal ? 'local' : activeConnectionId, 
-          path: isLocal ? localPath : remotePath 
-        })
+      const data = await apiClient.post<{ files: any[] }>('/api/files', { 
+        id: isLocal ? 'local' : activeConnectionId, 
+        path: isLocal ? localPath : remotePath 
       });
-      const data = await res.json();
       if (data.files) {
-         if (isLocal) setLocalFiles(data.files);
-         else setRemoteFiles(data.files);
+        if (isLocal) setLocalFiles(data.files);
+        else setRemoteFiles(data.files);
       }
-    } catch(e) {
-      console.error("Failed to fetch files", e);
+    } catch(e: any) {
+      addNotification({ type: 'error', message: 'Failed to fetch files' });
     }
-  };
+  }, [activeConnectionId, localPath, remotePath, setLocalFiles, setRemoteFiles, addNotification]);
 
   useEffect(() => {
     fetchFiles(true);

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Save } from 'lucide-react';
 import { FileItem, useStore } from '../store';
+import { apiClient } from '../lib/api';
 import { formatBytes } from '../lib/utils';
 import { format } from 'date-fns';
 
@@ -37,21 +38,11 @@ export default function PropertiesModal({
     if (!file) return;
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
     try {
-      await fetch('/api/files/permissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: cid, 
-          path, 
-          name: file.name, 
-          permissions 
-        })
-      });
+      await apiClient.post('/api/files/permissions', { id: cid, path, name: file.name, permissions });
       onRefresh();
       onClose();
     } catch(e) {
       console.error(e);
-      alert("Failed to update permissions");
     }
   };
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Folder, File as FileIcon, HardDrive, Globe, MoreHorizontal, ArrowUp, RefreshCw, Upload, Download, Plus, Trash2, Search } from 'lucide-react';
 import { useStore, FileItem } from '../store';
+import { apiClient } from '../lib/api';
 import { formatBytes, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import ContextMenu, { ContextMenuPosition } from './ContextMenu';
@@ -47,11 +48,21 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     setIsDragging(true);
   };
   const onDragLeave = () => setIsDragging(false);
-  const onDrop = (e: React.DragEvent) => {
+  const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    // Real app: upload logic here
-    console.log("Dropped files", e.dataTransfer.files);
+    const fileList = e.dataTransfer.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList) as File[];
+    const cid = isLocal ? 'local' : (activeConnectionId || 'local');
+    for (const file of files) {
+      try {
+        await apiClient.uploadFile('/api/files/upload', file, undefined, { id: cid, path });
+      } catch (err: any) {
+        console.error('Upload failed', err);
+      }
+    }
+    onRefresh();
   };
 
   const navigateUp = () => {
@@ -84,7 +95,6 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
 
   const handleAction = async (action: string) => {
     setContextMenu(null);
-    const targetId = activeConnectionId || 'local'; // Wait, let's use the actual side connection
     const currentPath = path;
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
 
@@ -101,17 +111,11 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     } else if (action === 'edit') {
       if (selected.length === 1) {
         const file = files.find(f => f.name === selected[0]);
-        if (file && file.type === 'file') {
-          setEditingFile(file);
-        }
+        if (file && file.type === 'file') setEditingFile(file);
       }
     } else if (action === 'delete') {
       const itemsToDelete = files.filter(f => selected.includes(f.name)).map(f => ({ path: currentPath, name: f.name, type: f.type }));
-      await fetch('/api/files/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: cid, items: itemsToDelete })
-      });
+      await apiClient.post('/api/files/delete', { id: cid, items: itemsToDelete });
       onRefresh();
     } else if (action === 'copy' || action === 'cut') {
       const itemsToCopy = files.filter(f => selected.includes(f.name));
@@ -124,71 +128,46 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     } else if (action === 'paste') {
       const clipboard = useStore.getState().clipboard;
       if (!clipboard) return;
-      
-      // Simple copy implementation (assumes server endpoint supports cross-environment or same-environment)
-      // Note: for now our copy endpoint only works on the same side.
       if (clipboard.sourceType === (isLocal ? 'local' : 'remote')) {
-         await fetch('/api/files/copy', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             id: cid,
-             items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })),
-             destPath: currentPath
-           })
-         });
-         
-         if (clipboard.type === 'cut') {
-           await fetch('/api/files/delete', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ id: cid, items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })) })
-           });
-           useStore.getState().setClipboard(null);
-         }
-         onRefresh();
-      } else {
-         alert("Cross-environment copy/paste is not implemented via this menu yet. Drag and Drop instead.");
+        await apiClient.post('/api/files/copy', {
+          id: cid,
+          items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })),
+          destPath: currentPath
+        });
+        if (clipboard.type === 'cut') {
+          await apiClient.post('/api/files/delete', {
+            id: cid,
+            items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type }))
+          });
+          useStore.getState().setClipboard(null);
+        }
+        onRefresh();
       }
     } else if (action === 'new-folder') {
       const name = prompt("Enter folder name:");
       if (name) {
-         await fetch('/api/files/create', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ id: cid, path: currentPath, type: 'folder', name })
-         });
-         onRefresh();
+        await apiClient.post('/api/files/create', { id: cid, path: currentPath, type: 'folder', name });
+        onRefresh();
       }
     } else if (action === 'new-file') {
       const name = prompt("Enter file name:");
       if (name) {
-         await fetch('/api/files/create', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ id: cid, path: currentPath, type: 'file', name })
-         });
-         onRefresh();
+        await apiClient.post('/api/files/create', { id: cid, path: currentPath, type: 'file', name });
+        onRefresh();
       }
     } else if (action === 'rename') {
       if (selected.length === 1) {
         const oldName = selected[0];
         const newName = prompt("Enter new name:", oldName);
         if (newName && newName !== oldName) {
-           await fetch('/api/files/rename', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ id: cid, path: currentPath, oldName, newName })
-           });
-           onRefresh();
+          await apiClient.post('/api/files/rename', { id: cid, path: currentPath, oldName, newName });
+          onRefresh();
         }
       }
     } else if (action === 'properties') {
       if (selected.length === 1) {
         const file = files.find(f => f.name === selected[0]);
-        if (file) {
-          setPropertiesFile(file);
-        }
+        if (file) setPropertiesFile(file);
       }
     }
   };

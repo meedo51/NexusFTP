@@ -7,6 +7,8 @@ import { useStore } from './store';
 import ConnectionManager from './components/ConnectionManager';
 import FileBrowser from './components/FileBrowser';
 import Sidebar from './components/Sidebar';
+import NotificationToast from './components/NotificationToast';
+import TransferManager from './components/TransferManager';
 
 export default function App() {
   const { isConnected, activeConnectionId, theme, isSidebarOpen, toggleSidebar } = useStore();
@@ -56,6 +58,8 @@ export default function App() {
            )}
         </div>
       </main>
+      <NotificationToast />
+      <TransferManager />
     </div>
   );
 }

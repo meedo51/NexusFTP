@@ -13,13 +13,26 @@ export default defineConfig(() => {
     },
     server: {
       host: '0.0.0.0',
-      port: 3000,
-      allowedHosts: ['iftp.xus.me', 'localhost'],
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
+      port: 3434,
+      allowedHosts: ['ifpt.xus.me', 'iftp.xus.me', 'localhost', '187.77.183.14'],
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5000',
+          changeOrigin: true,
+        },
+        '/ws': {
+          target: 'ws://localhost:5000',
+          ws: true,
+        },
+      },
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      minify: 'esbuild' as const,
+      chunkSizeWarningLimit: 500,
     },
   };
 });

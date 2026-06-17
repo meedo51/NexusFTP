@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { FileItem, useStore } from '../store';
+import { apiClient } from '../lib/api';
 import { X, Save, Settings, Copy, Search, CornerDownLeft, RotateCcw } from 'lucide-react';
 
 interface CodeEditorProps {
@@ -57,22 +58,15 @@ export default function CodeEditor({ file, path, isLocal, onClose, onRefresh }: 
       setLoading(true);
       const cid = isLocal ? 'local' : (activeConnectionId || 'local');
       try {
-        const res = await fetch('/api/files/read', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: cid, path, name: file.name })
-        });
-        const data = await res.json();
-        if (data.success) {
+        const data = await apiClient.post<{ success: boolean; content?: string; error?: string }>('/api/files/read', { id: cid, path, name: file.name });
+        if (data.success && data.content !== undefined) {
           setContent(data.content);
           setOriginalContent(data.content);
         } else {
-          alert('Failed to read file: ' + data.error);
           onClose();
         }
       } catch (e) {
         console.error(e);
-        alert('Failed to read file');
         onClose();
       } finally {
         setLoading(false);
@@ -88,21 +82,13 @@ export default function CodeEditor({ file, path, isLocal, onClose, onRefresh }: 
     setSaving(true);
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
     try {
-      const res = await fetch('/api/files/write', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: cid, path, name: file.name, content })
-      });
-      const data = await res.json();
+      const data = await apiClient.post<{ success: boolean; error?: string }>('/api/files/write', { id: cid, path, name: file.name, content });
       if (data.success) {
         setOriginalContent(content);
         onRefresh();
-      } else {
-        alert('Failed to save file: ' + data.error);
       }
     } catch (e) {
       console.error(e);
-      alert('Failed to save file');
     } finally {
       setSaving(false);
     }

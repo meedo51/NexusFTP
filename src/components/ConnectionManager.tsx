@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Server, HardDrive, Search, MoreVertical, Shield, Globe, Star } from 'lucide-react';
 import { useStore, ConnectionConfig } from '../store';
+import { apiClient } from '../lib/api';
 import { cn } from '../lib/utils';
 import ConnectionEditor from './ConnectionEditor';
+import NotificationToast from './NotificationToast';
 
 export default function ConnectionManager() {
-  const { connections, setActiveConnection, setIsConnected } = useStore();
+  const { connections, setActiveConnection, setIsConnected, addNotification } = useStore();
   const [search, setSearch] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingConn, setEditingConn] = useState<ConnectionConfig | null>(null);
@@ -17,20 +19,17 @@ export default function ConnectionManager() {
   const handleConnect = async (conn: ConnectionConfig) => {
     setConnectingId(conn.id);
     try {
-      const res = await fetch('/api/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(conn)
-      });
-      const data = await res.json();
+      const data = await apiClient.post<{ success: boolean; token?: string; error?: string }>('/api/connect', conn);
       if (data.success) {
+        if (data.token) apiClient.setToken(data.token);
         setActiveConnection(conn.id);
         setIsConnected(true);
+        addNotification({ type: 'success', message: `Connected to ${conn.name}` });
       } else {
-         alert('Connection failed: ' + data.error);
+        addNotification({ type: 'error', message: data.error || 'Connection failed' });
       }
     } catch (e: any) {
-      alert('Connection error: ' + e.message);
+      addNotification({ type: 'error', message: e.message || 'Connection error' });
     } finally {
       setConnectingId(null);
     }
@@ -109,7 +108,7 @@ export default function ConnectionManager() {
   );
 }
 
-function ConnectionCard({ conn, onConnect, onEdit, connecting, isLocal }: { conn: ConnectionConfig, onConnect: (c: ConnectionConfig) => void, onEdit: () => void, connecting: boolean, isLocal?: boolean }) {
+function ConnectionCard({ conn, onConnect, onEdit, connecting, isLocal }: { key?: string | number; conn: ConnectionConfig; onConnect: (c: ConnectionConfig) => void; onEdit: () => void; connecting: boolean; isLocal?: boolean }) {
   const getProtocolColor = (p: string) => {
     switch(p) {
       case 'sftp': return 'from-teal-500/20 to-emerald-500/5 border-teal-500/20 text-teal-400';

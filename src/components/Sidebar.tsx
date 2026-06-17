@@ -1,10 +1,16 @@
 import React from 'react';
 import { useStore } from '../store';
+import { apiClient } from '../lib/api';
 
 export default function Sidebar() {
-  const { isConnected, setIsConnected, setActiveConnection } = useStore();
+  const { isConnected, setIsConnected, setActiveConnection, activeConnectionId } = useStore();
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    if (activeConnectionId) {
+      try {
+        await apiClient.post('/api/disconnect', { id: activeConnectionId });
+      } catch (e) { /* ignore */ }
+    }
     setIsConnected(false);
     setActiveConnection(null);
   };

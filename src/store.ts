@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  message: string;
+  timeout?: number;
+}
+
 export type Protocol = 'ftp' | 'sftp' | 'ftps';
 
 export interface ConnectionConfig {
@@ -48,6 +55,9 @@ export interface Transfer {
 }
 
 interface AppState {
+  notifications: Notification[];
+  addNotification: (n: Omit<Notification, 'id'>) => void;
+  removeNotification: (id: string) => void;
   connections: ConnectionConfig[];
   activeConnectionId: string | null;
   isConnected: boolean;
@@ -127,6 +137,14 @@ export const useStore = create<AppState>()(
       
       theme: 'dark',
       
+      notifications: [],
+      addNotification: (n) => set((state) => ({
+        notifications: [...state.notifications, { ...n, id: crypto.randomUUID() }],
+      })),
+      removeNotification: (id) => set((state) => ({
+        notifications: state.notifications.filter(n => n.id !== id),
+      })),
+
       clipboard: null,
       setClipboard: (data) => set({ clipboard: data }),
       

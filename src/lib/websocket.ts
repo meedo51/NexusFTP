@@ -13,7 +13,7 @@ export class WebSocketManager {
   private isConnecting = false;
   private isConnected = false;
   private listeners: Map<string, Set<Function>> = new Map();
-  private pingInterval: NodeJS.Timeout | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private connectionPromise: Promise<void> | null = null;
   private resolveConnection: (() => void) | null = null;
   private rejectConnection: ((error: Error) => void) | null = null;
@@ -309,7 +309,7 @@ export class WebSocketManager {
 }
 
 export const createWebSocketManager = (token: string): WebSocketManager => {
-  const wsUrl = import.meta.env.VITE_WS_URL || 'wss://iftp.xus.me';
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3434/ws`;
   return new WebSocketManager(wsUrl, token);
 };
 
