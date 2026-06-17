@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Save, Shield } from 'lucide-react';
 import { useStore, ConnectionConfig, Protocol } from '../store';
+import { generateId } from '../lib/utils';
 
 export default function ConnectionEditor({ conn, onClose }: { conn: ConnectionConfig | null, onClose: () => void }) {
   const { addConnection, updateConnection, deleteConnection } = useStore();
   
   const [formData, setFormData] = useState<Partial<ConnectionConfig>>(
     conn || {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: 'New Connection',
       protocol: 'sftp',
       host: '',

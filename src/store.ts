@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { generateId } from './lib/utils';
 
 export interface Notification {
   id: string;
@@ -139,7 +140,7 @@ export const useStore = create<AppState>()(
       
       notifications: [],
       addNotification: (n) => set((state) => ({
-        notifications: [...state.notifications, { ...n, id: crypto.randomUUID() }],
+        notifications: [...state.notifications, { ...n, id: generateId() }],
       })),
       removeNotification: (id) => set((state) => ({
         notifications: state.notifications.filter(n => n.id !== id),
