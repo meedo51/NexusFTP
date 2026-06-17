@@ -28,10 +28,8 @@ export default function FileBrowser() {
   };
 
   useEffect(() => {
-    if (isConnected) {
-       fetchFiles(true);
-    }
-  }, [isConnected, localPath]);
+    fetchFiles(true);
+  }, [localPath]);
 
   useEffect(() => {
     if (isConnected && activeConnectionId) {

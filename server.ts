@@ -282,6 +282,28 @@ app.get('/api/files/download', async (req, res) => {
   }
 });
 
+app.post('/api/files/permissions', async (req, res) => {
+  const { id, path: dirPath, name, permissions } = req.body;
+  const conn = activeConnections.get(id);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const resolvedPath = path.resolve(dirPath || process.cwd(), name);
+      // permissions comes in as e.g. "755" or "drwxr-xr-x"
+      // We only support numerical for simplicity here
+      const mode = parseInt(permissions.replace(/[^0-9]/g, ''), 8);
+      if (!isNaN(mode)) {
+        await fs.promises.chmod(resolvedPath, mode);
+      }
+      return res.json({ success: true });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+  return res.json({ success: true });
+});
+
 // For keeping it scoped, and since standard Vite setup applies, start Vite below:
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

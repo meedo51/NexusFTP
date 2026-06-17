@@ -5,6 +5,7 @@ import { useStore, FileItem } from '../store';
 import { formatBytes, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import ContextMenu, { ContextMenuPosition } from './ContextMenu';
+import PropertiesModal from './PropertiesModal';
 
 export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, onRefresh: () => void }) {
   const { 
@@ -22,6 +23,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
   
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [contextMenu, setContextMenu] = useState<{ pos: ContextMenuPosition, target?: string } | null>(null);
+  const [propertiesFile, setPropertiesFile] = useState<FileItem | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const onDragOver = (e: React.DragEvent) => {
@@ -72,7 +74,13 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
 
     if (action === 'download') {
       for (const itemName of selected) {
-        window.open(`/api/files/download?id=${cid}&path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(itemName)}`);
+        const url = `/api/files/download?id=${cid}&path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(itemName)}`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = itemName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     } else if (action === 'delete') {
       const itemsToDelete = files.filter(f => selected.includes(f.name)).map(f => ({ path: currentPath, name: f.name, type: f.type }));
@@ -156,7 +164,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
       if (selected.length === 1) {
         const file = files.find(f => f.name === selected[0]);
         if (file) {
-          alert(`Name: ${file.name}\nType: ${file.type}\nSize: ${formatBytes(file.size, 2)}\nModified: ${format(new Date(file.modifyTime), 'PPpp')}\nPermissions: ${file.permissions}\nOwner: ${file.owner}`);
+          setPropertiesFile(file);
         }
       }
     }
@@ -334,6 +342,14 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
             </div>
           )}
        </div>
+
+       <PropertiesModal 
+         file={propertiesFile} 
+         isLocal={isLocal}
+         path={path}
+         onClose={() => setPropertiesFile(null)}
+         onRefresh={onRefresh}
+       />
 
        {contextMenu && (
          <ContextMenu 
