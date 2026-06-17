@@ -58,7 +58,7 @@ export default function CodeEditor({ file, path, isLocal, onClose, onRefresh }: 
       setLoading(true);
       const cid = isLocal ? 'local' : (activeConnectionId || 'local');
       try {
-        const data = await apiClient.post<{ success: boolean; content?: string; error?: string }>('/api/files/read', { id: cid, path, name: file.name });
+        const data = await         apiClient.post<{ success: boolean; content?: string; error?: string }>('/files/read', { id: cid, path, name: file.name });
         if (data.success && data.content !== undefined) {
           setContent(data.content);
           setOriginalContent(data.content);
@@ -82,7 +82,7 @@ export default function CodeEditor({ file, path, isLocal, onClose, onRefresh }: 
     setSaving(true);
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
     try {
-      const data = await apiClient.post<{ success: boolean; error?: string }>('/api/files/write', { id: cid, path, name: file.name, content });
+      const data = await apiClient.post<{ success: boolean; error?: string }>('/files/write', { id: cid, path, name: file.name, content });
       if (data.success) {
         setOriginalContent(content);
         onRefresh();

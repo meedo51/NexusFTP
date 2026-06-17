@@ -38,7 +38,7 @@ export default function PropertiesModal({
     if (!file) return;
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
     try {
-      await apiClient.post('/api/files/permissions', { id: cid, path, name: file.name, permissions });
+            await apiClient.post('/files/permissions', { id: cid, path, name: file.name, permissions });
       onRefresh();
       onClose();
     } catch(e) {

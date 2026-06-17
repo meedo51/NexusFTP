@@ -8,7 +8,7 @@ export default function Sidebar() {
   const handleDisconnect = async () => {
     if (activeConnectionId) {
       try {
-        await apiClient.post('/api/disconnect', { id: activeConnectionId });
+                await apiClient.post('/disconnect', { id: activeConnectionId });
       } catch (e) { /* ignore */ }
     }
     setIsConnected(false);

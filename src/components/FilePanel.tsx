@@ -57,7 +57,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     const cid = isLocal ? 'local' : (activeConnectionId || 'local');
     for (const file of files) {
       try {
-        await apiClient.uploadFile('/api/files/upload', file, undefined, { id: cid, path });
+                await apiClient.uploadFile('/files/upload', file, undefined, { id: cid, path });
       } catch (err: any) {
         console.error('Upload failed', err);
       }
@@ -115,7 +115,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
       }
     } else if (action === 'delete') {
       const itemsToDelete = files.filter(f => selected.includes(f.name)).map(f => ({ path: currentPath, name: f.name, type: f.type }));
-      await apiClient.post('/api/files/delete', { id: cid, items: itemsToDelete });
+      await apiClient.post('/files/delete', { id: cid, items: itemsToDelete });
       onRefresh();
     } else if (action === 'copy' || action === 'cut') {
       const itemsToCopy = files.filter(f => selected.includes(f.name));
@@ -129,13 +129,13 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
       const clipboard = useStore.getState().clipboard;
       if (!clipboard) return;
       if (clipboard.sourceType === (isLocal ? 'local' : 'remote')) {
-        await apiClient.post('/api/files/copy', {
+                await apiClient.post('/files/copy', {
           id: cid,
           items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type })),
           destPath: currentPath
         });
         if (clipboard.type === 'cut') {
-          await apiClient.post('/api/files/delete', {
+          await apiClient.post('/files/delete', {
             id: cid,
             items: clipboard.items.map(f => ({ path: clipboard.sourcePath, name: f.name, type: f.type }))
           });
@@ -146,13 +146,13 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     } else if (action === 'new-folder') {
       const name = prompt("Enter folder name:");
       if (name) {
-        await apiClient.post('/api/files/create', { id: cid, path: currentPath, type: 'folder', name });
+        await apiClient.post('/files/create', { id: cid, path: currentPath, type: 'folder', name });
         onRefresh();
       }
     } else if (action === 'new-file') {
       const name = prompt("Enter file name:");
       if (name) {
-        await apiClient.post('/api/files/create', { id: cid, path: currentPath, type: 'file', name });
+        await apiClient.post('/files/create', { id: cid, path: currentPath, type: 'file', name });
         onRefresh();
       }
     } else if (action === 'rename') {
@@ -160,7 +160,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
         const oldName = selected[0];
         const newName = prompt("Enter new name:", oldName);
         if (newName && newName !== oldName) {
-          await apiClient.post('/api/files/rename', { id: cid, path: currentPath, oldName, newName });
+                    await apiClient.post('/files/rename', { id: cid, path: currentPath, oldName, newName });
           onRefresh();
         }
       }

@@ -19,7 +19,7 @@ export default function ConnectionManager() {
   const handleConnect = async (conn: ConnectionConfig) => {
     setConnectingId(conn.id);
     try {
-      const data = await apiClient.post<{ success: boolean; token?: string; error?: string }>('/api/connect', conn);
+            const data = await apiClient.post<{ success: boolean; token?: string; error?: string }>('/connect', conn);
       if (data.success) {
         if (data.token) apiClient.setToken(data.token);
         setActiveConnection(conn.id);

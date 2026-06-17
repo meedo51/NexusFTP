@@ -10,7 +10,7 @@ export default function FileBrowser() {
 
   const fetchFiles = useCallback(async (isLocal: boolean) => {
     try {
-      const data = await apiClient.post<{ files: any[] }>('/api/files', { 
+            const data = await apiClient.post<{ files: any[] }>('/files', { 
         id: isLocal ? 'local' : activeConnectionId, 
         path: isLocal ? localPath : remotePath 
       });
