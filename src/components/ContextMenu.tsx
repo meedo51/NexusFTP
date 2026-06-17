@@ -61,6 +61,7 @@ export default function ContextMenu({ pos, isLocal, target, onClose, onAction }:
 
         {target && !isMulti && (
           <>
+            <MenuItem icon={<Edit2 size={15}/>} label="Edit / View" onClick={() => onAction?.('edit')} />
             <MenuItem icon={<Download size={15}/>} label="Download" shortcut="Cmd D" onClick={() => onAction?.('download')} />
             <MenuItem icon={<Edit2 size={15}/>} label="Rename" shortcut="Enter" onClick={() => onAction?.('rename')} />
             <div className="h-px bg-white/10 my-1 mx-2" />

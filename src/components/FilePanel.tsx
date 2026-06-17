@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Folder, File as FileIcon, HardDrive, Globe, MoreHorizontal, ArrowUp, RefreshCw, Upload, Download, Plus, Trash2 } from 'lucide-react';
+import { Folder, File as FileIcon, HardDrive, Globe, MoreHorizontal, ArrowUp, RefreshCw, Upload, Download, Plus, Trash2, Search } from 'lucide-react';
 import { useStore, FileItem } from '../store';
 import { formatBytes, cn } from '../lib/utils';
 import { format } from 'date-fns';
 import ContextMenu, { ContextMenuPosition } from './ContextMenu';
 import PropertiesModal from './PropertiesModal';
+import CodeEditor from './CodeEditor';
 
 export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, onRefresh: () => void }) {
   const { 
@@ -24,7 +25,21 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [contextMenu, setContextMenu] = useState<{ pos: ContextMenuPosition, target?: string } | null>(null);
   const [propertiesFile, setPropertiesFile] = useState<FileItem | null>(null);
+  const [editingFile, setEditingFile] = useState<FileItem | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const [pathInput, setPathInput] = useState(path);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    setPathInput(path);
+  }, [path]);
+
+  const handleGo = () => {
+    const normalizedStr = pathInput.trim() || '/';
+    if (isLocal) setLocalPath(normalizedStr);
+    else setRemotePath(normalizedStr);
+  };
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -81,6 +96,13 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+      }
+    } else if (action === 'edit') {
+      if (selected.length === 1) {
+        const file = files.find(f => f.name === selected[0]);
+        if (file && file.type === 'file') {
+          setEditingFile(file);
+        }
       }
     } else if (action === 'delete') {
       const itemsToDelete = files.filter(f => selected.includes(f.name)).map(f => ({ path: currentPath, name: f.name, type: f.type }));
@@ -170,8 +192,9 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
     }
   };
 
-  // Sorted: folders first, then files, alphabetically
-  const sortedFiles = [...files].sort((a, b) => {
+  // Filtered and Sorted: folders first, then files, alphabetically
+  const filteredFiles = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
      if (a.type === 'dir' && b.type === 'file') return -1;
      if (a.type === 'file' && b.type === 'dir') return 1;
      return a.name.localeCompare(b.name);
@@ -185,41 +208,46 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
        onDragLeave={onDragLeave}
        onDrop={onDrop}
     >
-       {/* Breadcrumb Header */}
-       <div className="h-12 border-b border-white/10 flex items-center justify-between px-4 shrink-0 bg-transparent">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-             <div className="flex items-center justify-center p-1.5 rounded-md bg-white/5 text-gray-400 shrink-0">
-               {isLocal ? <HardDrive size={16} /> : <Globe size={16} />}
-             </div>
-             
-             {/* Simple path parsing */}
-             <div className="flex items-center text-sm font-medium text-gray-300 whitespace-nowrap">
-                <span className="cursor-pointer hover:text-white transition-colors" onClick={() => (isLocal ? setLocalPath('/') : setRemotePath('/'))}>
-                  {isLocal ? 'Local' : 'Remote'}
-                </span>
-                {path !== '/' && path.split('/').filter(Boolean).map((segment, i, arr) => {
-                   const partial = '/' + arr.slice(0, i + 1).join('/');
-                   return (
-                     <React.Fragment key={i}>
-                       <span className="mx-1.5 text-gray-600">/</span>
-                       <span 
-                         className="cursor-pointer hover:text-white transition-colors text-white"
-                         onClick={() => (isLocal ? setLocalPath(partial) : setRemotePath(partial))}
-                       >
-                         {segment}
-                       </span>
-                     </React.Fragment>
-                   )
-                })}
-             </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0 ml-4">
-             <button onClick={navigateUp} disabled={path === '/'} className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-30">
+       {/* Address & Search Header */}
+       <div className="h-12 border-b border-white/10 flex items-center justify-between px-4 shrink-0 bg-transparent gap-3">
+          <div className="flex items-center gap-1 shrink-0">
+             <button onClick={navigateUp} disabled={path === '/'} className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-30 flex items-center justify-center">
                 <ArrowUp size={16} />
              </button>
-             <button onClick={onRefresh} className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+             <button onClick={onRefresh} className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors flex items-center justify-center">
                 <RefreshCw size={16} />
              </button>
+          </div>
+
+          <div className="flex-1 flex items-center bg-black/40 border border-white/10 rounded-md overflow-hidden relative group focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all">
+             <div className="pl-3 pr-2 text-gray-400 group-focus-within:text-indigo-400 pointer-events-none flex items-center justify-center">
+               {isLocal ? <HardDrive size={14} /> : <Globe size={14} />}
+             </div>
+             <input
+               type="text"
+               value={pathInput}
+               onChange={e => setPathInput(e.target.value)}
+               onKeyDown={e => e.key === 'Enter' && handleGo()}
+               className="flex-1 bg-transparent border-none focus:outline-none text-sm text-gray-200 py-1.5 min-w-0"
+               placeholder="Enter path..."
+             />
+             <button 
+               onClick={handleGo}
+               className="px-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border-l border-white/10 transition-colors text-sm font-medium h-full"
+             >
+               Go
+             </button>
+          </div>
+
+          <div className="w-48 relative flex items-center shrink-0">
+             <Search size={14} className="absolute left-2.5 text-gray-400" />
+             <input
+               type="text"
+               value={searchQuery}
+               onChange={e => setSearchQuery(e.target.value)}
+               placeholder="Search..."
+               className="w-full bg-black/40 border border-white/10 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 rounded-md pl-8 pr-3 py-1.5 text-sm text-gray-200 focus:outline-none transition-all placeholder:text-gray-500"
+             />
           </div>
        </div>
        
@@ -284,7 +312,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
                      transition={{ duration: 0.15 }}
                      key={file.name}
                      onClick={(e) => toggleSelection(file.name, e.metaKey || e.ctrlKey || e.shiftKey)}
-                     onDoubleClick={() => file.type === 'dir' ? navigateTo(file.name) : null}
+                     onDoubleClick={() => file.type === 'dir' ? navigateTo(file.name) : setEditingFile(file)}
                      onContextMenu={(e) => { e.stopPropagation(); handleContextMenu(e, file.name); }}
                      className={cn(
                        "grid grid-cols-[30px_minmax(0,1fr)_80px_120px] lg:grid-cols-[30px_minmax(0,1fr)_100px_140px] gap-4 px-3 py-2.5 rounded-lg items-center cursor-pointer transition-all border border-transparent select-none group",
@@ -317,7 +345,7 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
                      transition={{ duration: 0.15 }}
                      key={file.name}
                      onClick={(e) => toggleSelection(file.name, e.metaKey || e.ctrlKey || e.shiftKey)}
-                     onDoubleClick={() => file.type === 'dir' ? navigateTo(file.name) : null}
+                     onDoubleClick={() => file.type === 'dir' ? navigateTo(file.name) : setEditingFile(file)}
                      onContextMenu={(e) => { e.stopPropagation(); handleContextMenu(e, file.name); }}
                      className={cn(
                        "flex flex-col items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer select-none group h-full",
@@ -372,6 +400,18 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
             </div>
          </div>
        )}
+
+       <AnimatePresence>
+         {editingFile && (
+           <CodeEditor
+             file={editingFile}
+             path={path}
+             isLocal={isLocal}
+             onClose={() => setEditingFile(null)}
+             onRefresh={onRefresh}
+           />
+         )}
+       </AnimatePresence>
     </div>
   )
 }

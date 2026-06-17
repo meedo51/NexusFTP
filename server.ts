@@ -304,6 +304,40 @@ app.post('/api/files/permissions', async (req, res) => {
   return res.json({ success: true });
 });
 
+app.post('/api/files/read', async (req, res) => {
+  const { id, path: dirPath, name } = req.body;
+  const conn = activeConnections.get(id);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const resolvedPath = path.resolve(dirPath || process.cwd(), name);
+      const content = await fs.promises.readFile(resolvedPath, 'utf8');
+      return res.json({ success: true, content });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+  return res.status(500).json({ error: 'Unsupported connection type for read' });
+});
+
+app.post('/api/files/write', async (req, res) => {
+  const { id, path: dirPath, name, content } = req.body;
+  const conn = activeConnections.get(id);
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
+
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const resolvedPath = path.resolve(dirPath || process.cwd(), name);
+      await fs.promises.writeFile(resolvedPath, content, 'utf8');
+      return res.json({ success: true });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+  return res.status(500).json({ error: 'Unsupported connection type for write' });
+});
+
 // For keeping it scoped, and since standard Vite setup applies, start Vite below:
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
