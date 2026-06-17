@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import ContextMenu, { ContextMenuPosition } from './ContextMenu';
 import PropertiesModal from './PropertiesModal';
 import CodeEditor from './CodeEditor';
+import CodeEditorErrorBoundary from './CodeEditorErrorBoundary';
 
 export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, onRefresh: () => void }) {
   const { 
@@ -403,13 +404,15 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
 
        <AnimatePresence>
          {editingFile && (
-           <CodeEditor
-             file={editingFile}
-             path={path}
-             isLocal={isLocal}
-             onClose={() => setEditingFile(null)}
-             onRefresh={onRefresh}
-           />
+           <CodeEditorErrorBoundary key="editor-boundary">
+             <CodeEditor
+               file={editingFile}
+               path={path}
+               isLocal={isLocal}
+               onClose={() => setEditingFile(null)}
+               onRefresh={onRefresh}
+             />
+           </CodeEditorErrorBoundary>
          )}
        </AnimatePresence>
     </div>

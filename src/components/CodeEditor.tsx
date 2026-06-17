@@ -194,6 +194,9 @@ export default function CodeEditor({ file, path, isLocal, onClose, onRefresh }: 
               padding: { top: 16 },
               smoothScrolling: true,
               cursorBlinking: 'smooth',
+              multiCursorModifier: 'alt',
+              formatOnPaste: true,
+              formatOnType: true,
             }}
           />
         </div>
