@@ -15,7 +15,7 @@ import { Client as SshClient } from 'ssh2';
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = 3000;
 
 app.use(express.json());
 

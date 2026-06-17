@@ -13,7 +13,7 @@ export default defineConfig(() => {
     },
     server: {
       host: '0.0.0.0',
-      port: parseInt(process.env.PORT || '3000', 10),
+      port: 3000,
       allowedHosts: ['iftp.xus.me', 'localhost'],
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
