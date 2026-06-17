@@ -58,6 +58,8 @@ interface AppState {
   
   isSidebarOpen: boolean;
   
+  layoutMode: 'split' | 'local' | 'remote';
+  
   transfers: Transfer[];
   
   theme: 'dark' | 'light' | 'system';
@@ -80,6 +82,8 @@ interface AppState {
   clearSelection: () => void;
   
   toggleSidebar: () => void;
+  
+  setLayoutMode: (mode: 'split' | 'local' | 'remote') => void;
   
   setSplitViewRatio: (ratio: number) => void;
   
@@ -104,6 +108,8 @@ export const useStore = create<AppState>()(
       selectedRemoteFiles: [],
       
       isSidebarOpen: true,
+      
+      layoutMode: 'split',
       
       splitViewRatio: 50,
       
@@ -145,6 +151,8 @@ export const useStore = create<AppState>()(
       
       toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
       
+      setLayoutMode: (mode) => set({ layoutMode: mode }),
+      
       setSplitViewRatio: (ratio) => set({ splitViewRatio: ratio }),
       
       addTransfer: (transfer) => set((state) => ({ transfers: [...state.transfers, transfer] })),
@@ -157,7 +165,8 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         connections: state.connections,
         theme: state.theme,
-        splitViewRatio: state.splitViewRatio
+        splitViewRatio: state.splitViewRatio,
+        layoutMode: state.layoutMode
       }),
     }
   )

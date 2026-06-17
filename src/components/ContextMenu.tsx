@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { FolderPlus, FilePlus, Edit2, Trash2, Download, Upload, Info, Copy, Scissors, ClipboardPaste, X } from 'lucide-react';
 import { useStore } from '../store';
@@ -18,11 +19,13 @@ interface ContextMenuType {
 export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMenuType) {
   const ref = useRef<HTMLDivElement>(null);
   const { selectedLocalFiles, selectedRemoteFiles } = useStore();
+  const [mounted, setMounted] = useState(false);
   
   const selected = isLocal ? selectedLocalFiles : selectedRemoteFiles;
   const isMulti = selected.length > 1;
 
   useEffect(() => {
+    setMounted(true);
     const handleOutsideClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         onClose();
@@ -38,7 +41,7 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
     left: Math.min(pos.x, window.innerWidth - 220),
   };
 
-  return (
+  const menuContent = (
     <AnimatePresence>
       <motion.div 
         ref={ref}
@@ -47,7 +50,7 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.15 }}
         style={style}
-        className="fixed w-56 bg-black/60 border border-white/10 rounded-xl shadow-2xl flex flex-col py-1.5 z-50 overflow-hidden backdrop-blur-xl"
+        className="fixed w-56 bg-black/60 border border-white/10 rounded-xl shadow-2xl flex flex-col py-1.5 z-[9999] overflow-hidden backdrop-blur-xl"
       >
         <div className="px-3 py-2 border-b border-white/5 mb-1 bg-white/5">
            <p className="text-xs font-semibold text-gray-400 truncate">
@@ -102,6 +105,9 @@ export default function ContextMenu({ pos, isLocal, target, onClose }: ContextMe
       </motion.div>
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(menuContent, document.body);
 }
 
 function MenuItem({ icon, label, shortcut, danger, disabled }: any) {

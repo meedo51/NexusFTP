@@ -15,7 +15,7 @@ import { Client as SshClient } from 'ssh2';
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
-const PORT = 3434;
+const PORT = 3000;
 
 app.use(express.json());
 
@@ -36,25 +36,6 @@ wss.on('connection', (ws) => {
 
 // Setup Multer for upload proxying in memory (limit max file size for safety if needed)
 const upload = multer({ dest: '/tmp/nexus-ftp-uploads' });
-
-// Simulated local storage to demonstrate operations safely
-const MOCK_FILES: Record<string, any[]> = {
-  '/': [
-    { name: 'Documents', type: 'dir', size: 0, modifyTime: new Date().toISOString(), permissions: 'drwxr-xr-x', owner: 'user', group: 'staff' },
-    { name: 'Downloads', type: 'dir', size: 0, modifyTime: new Date().toISOString(), permissions: 'drwxr-xr-x', owner: 'user', group: 'staff' },
-    { name: 'config.json', type: 'file', size: 1024, modifyTime: new Date().toISOString(), permissions: '-rw-r--r--', owner: 'user', group: 'staff' },
-    { name: 'readme.txt', type: 'file', size: 256, modifyTime: new Date().toISOString(), permissions: '-rw-r--r--', owner: 'user', group: 'staff' }
-  ],
-  '/Documents': [
-    { name: 'Work', type: 'dir', size: 0, modifyTime: new Date().toISOString(), permissions: 'drwxr-xr-x', owner: 'user', group: 'staff' },
-    { name: 'invoice.pdf', type: 'file', size: 1048576, modifyTime: new Date().toISOString(), permissions: '-rw-r--r--', owner: 'user', group: 'staff' },
-  ],
-  '/Documents/Work': [
-    { name: 'project.zip', type: 'file', size: 5242880, modifyTime: new Date().toISOString(), permissions: '-rw-r--r--', owner: 'user', group: 'staff' }
-  ],
-  '/Downloads': []
-};
-
 
 // API Endpoints
 app.post('/api/connect', async (req, res) => {
@@ -121,17 +102,37 @@ app.post('/api/disconnect', (req, res) => {
 app.post('/api/files', async (req, res) => {
   const { id, path: dirPath } = req.body;
   const conn = activeConnections.get(id);
-  if (!conn) return res.status(400).json({ error: 'Not connected' });
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
 
   try {
-    if (conn.type === 'local') {
-      const normalizedPath = dirPath.endsWith('/') && dirPath.length > 1 ? dirPath.slice(0, -1) : dirPath || '/';
-      const files = MOCK_FILES[normalizedPath];
-      if (!files) return res.status(404).json({ error: 'Directory not found' });
-      // Simulate network delay
-      await new Promise(r => setTimeout(r, 600));
-      return res.json({ files });
-    } else if (conn.type === 'ftp') {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+      const resolvedPath = path.resolve(dirPath || process.cwd());
+      
+      try {
+        const items = await fs.promises.readdir(resolvedPath, { withFileTypes: true });
+        
+        const files = await Promise.all(items.map(async (item) => {
+          try {
+            const stats = await fs.promises.stat(path.join(resolvedPath, item.name));
+            return {
+              name: item.name,
+              type: item.isDirectory() ? 'dir' : 'file',
+              size: stats.size,
+              modifyTime: stats.mtime.toISOString(),
+              permissions: (item.isDirectory() ? 'd' : '-') + (stats.mode & parseInt('777', 8)).toString(8),
+              owner: stats.uid.toString(),
+              group: stats.gid.toString()
+            };
+          } catch (e) {
+             return null;
+          }
+        }));
+        
+        return res.json({ files: files.filter(Boolean) });
+      } catch (e: any) {
+        return res.status(404).json({ error: 'Directory not found', details: e.message });
+      }
+    } else if (conn && conn.type === 'ftp') {
       const list = await conn.client.list(dirPath);
       const files = list.map((f: any) => ({
         name: f.name,
@@ -168,24 +169,28 @@ app.post('/api/files', async (req, res) => {
 app.post('/api/files/create', async (req, res) => {
   const { id, path: targetPath, type, name } = req.body;
   const conn = activeConnections.get(id);
-  if (!conn) return res.status(400).json({ error: 'Not connected' });
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
 
   try {
-     if (conn.type === 'local') {
-       if (!MOCK_FILES[targetPath]) MOCK_FILES[targetPath] = [];
+     if (id === 'local' || (conn && conn.type === 'local')) {
+       const resolvedPath = path.resolve(targetPath || process.cwd(), name);
+       if (type === 'folder') {
+         await fs.promises.mkdir(resolvedPath, { recursive: true });
+       } else {
+         await fs.promises.writeFile(resolvedPath, '');
+       }
+       
+       const stats = await fs.promises.stat(resolvedPath);
+       
        const newItem = {
          name,
          type: type === 'folder' ? 'dir' : 'file',
-         size: 0,
-         modifyTime: new Date().toISOString(),
-         permissions: type === 'folder' ? 'drwxr-xr-x' : '-rw-r--r--',
-         owner: 'user',
-         group: 'user'
+         size: stats.size,
+         modifyTime: stats.mtime.toISOString(),
+         permissions: (type === 'folder' ? 'd' : '-') + (stats.mode & parseInt('777', 8)).toString(8),
+         owner: stats.uid.toString(),
+         group: stats.gid.toString()
        };
-       MOCK_FILES[targetPath].push(newItem);
-       if (type === 'folder') {
-         MOCK_FILES[`${targetPath === '/' ? '' : targetPath}/${name}`] = [];
-       }
        return res.json({ success: true, item: newItem });
      } else {
         // Implement real create dir if needed
@@ -199,18 +204,24 @@ app.post('/api/files/create', async (req, res) => {
 app.post('/api/files/delete', async (req, res) => {
   const { id, items } = req.body; // items: { path, name, type }[]
   const conn = activeConnections.get(id);
-  if (!conn) return res.status(400).json({ error: 'Not connected' });
+  if (id !== 'local' && !conn) return res.status(400).json({ error: 'Not connected' });
 
-  if (conn.type === 'local') {
-     for (const item of items) {
-        const arr = MOCK_FILES[item.path];
-        if (arr) {
-           const idx = arr.findIndex(f => f.name === item.name);
-           if (idx !== -1) arr.splice(idx, 1);
-        }
-     }
-     return res.json({ success: true });
+  try {
+    if (id === 'local' || (conn && conn.type === 'local')) {
+       for (const item of items) {
+          const resolvedPath = path.resolve(item.path, item.name);
+          if (item.type === 'dir') {
+             await fs.promises.rm(resolvedPath, { recursive: true, force: true });
+          } else {
+             await fs.promises.unlink(resolvedPath);
+          }
+       }
+       return res.json({ success: true });
+    }
+  } catch (err: any) {
+     return res.status(500).json({ error: err.message });
   }
+  
   res.json({ success: true });
 });
 
