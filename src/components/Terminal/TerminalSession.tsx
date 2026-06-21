@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -68,25 +68,38 @@ export default function TerminalSession({ sessionId, isActive }: TerminalSession
 
     const token = apiClient.getToken();
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const baseUrl = import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}/ws`;
-    const wsUrl = `${baseUrl}/terminal?sessionId=${sessionId}&token=${token}`;
+    const wsUrl = `${import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}/ws`}?token=${token}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
+    let connected = false;
+
     ws.onopen = () => {
-      term.writeln('\x1b[32mTerminal connected\x1b[0m');
+      ws.send(JSON.stringify({ type: 'terminal_connect', sessionId }));
     };
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'data') {
-          term.write(msg.data);
-        } else if (msg.type === 'error') {
-          term.writeln(`\x1b[31m${msg.error}\x1b[0m`);
-        } else if (msg.type === 'closed') {
-          term.writeln('\x1b[31mSession closed\x1b[0m');
+        switch (msg.type) {
+          case 'terminal_connected':
+            connected = true;
+            term.writeln('\x1b[32mTerminal connected\x1b[0m');
+            break;
+          case 'terminal_data':
+            term.write(msg.data);
+            break;
+          case 'terminal_error':
+            term.writeln(`\x1b[31m${msg.error}\x1b[0m`);
+            break;
+          case 'terminal_closed':
+            term.writeln('\x1b[31mSession closed\x1b[0m');
+            break;
+          case 'connected':
+            break;
+          default:
+            break;
         }
       } catch {
         // ignore
@@ -98,14 +111,14 @@ export default function TerminalSession({ sessionId, isActive }: TerminalSession
     };
 
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data }));
+      if (connected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'terminal_input', data }));
       }
     });
 
     term.onResize(({ cols, rows }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+      if (connected && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'terminal_resize', cols, rows }));
       }
     });
 
