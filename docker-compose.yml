@@ -38,7 +38,6 @@ services:
     restart: unless-stopped
     environment:
       - VITE_API_URL=/api
-      - VITE_WS_URL=ws://ifpt.xus.me:3434/ws
     ports:
       - "${PORT:-3434}:80"
     networks:
