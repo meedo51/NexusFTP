@@ -67,7 +67,9 @@ export default function TerminalSession({ sessionId, isActive }: TerminalSession
     resizeObserver.observe(containerRef.current);
 
     const token = apiClient.getToken();
-    const wsUrl = `${import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3434/ws`}/terminal?sessionId=${sessionId}&token=${token}`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const baseUrl = import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${baseUrl}/terminal?sessionId=${sessionId}&token=${token}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

@@ -309,7 +309,8 @@ export class WebSocketManager {
 }
 
 export const createWebSocketManager = (token: string): WebSocketManager => {
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:3434/ws`;
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}/ws`;
   return new WebSocketManager(wsUrl, token);
 };
 
