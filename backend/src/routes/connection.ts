@@ -5,8 +5,20 @@ import { generateToken } from '../middleware/auth.js';
 import { connectLimiter } from '../middleware/rateLimiter.js';
 import logger from '../utils/logger.js';
 
+export interface ConnectionInfo {
+  type: 'local' | 'ftp' | 'sftp';
+  service: FtpService | SftpService | null;
+  credentials?: {
+    host: string;
+    port: number;
+    username: string;
+    password?: string;
+    privateKey?: string;
+  };
+}
+
 const router = Router();
-const activeConnections = new Map<string, { type: 'local' | 'ftp' | 'sftp'; service: FtpService | SftpService | null }>();
+const activeConnections = new Map<string, ConnectionInfo>();
 
 export function getActiveConnections(): Map<string, any> {
   return activeConnections as any;
@@ -29,14 +41,14 @@ router.post('/connect', connectLimiter, async (req, res) => {
     if (protocol === 'ftp' || protocol === 'ftps') {
       const service = new FtpService();
       await service.connect(host, port || 21, username, password || '', protocol === 'ftps');
-      activeConnections.set(id, { type: 'ftp', service });
+      activeConnections.set(id, { type: 'ftp', service, credentials: { host, port: port || 21, username, password } });
       const token = generateToken(id, username);
       logger.info('FTP connection established', { id, host, username });
       return res.json({ success: true, message: `Connected via ${protocol.toUpperCase()}`, token });
     } else if (protocol === 'sftp') {
       const service = new SftpService();
       await service.connect(host, port || 22, username, password, privateKey);
-      activeConnections.set(id, { type: 'sftp', service });
+      activeConnections.set(id, { type: 'sftp', service, credentials: { host, port: port || 22, username, password, privateKey } });
       const token = generateToken(id, username);
       logger.info('SFTP connection established', { id, host, username });
       return res.json({ success: true, message: 'Connected via SFTP', token });

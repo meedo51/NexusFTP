@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
+
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 import logger from './utils/logger.js';
@@ -15,10 +16,12 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import connectionRoutes from './routes/connection.js';
 import fileRoutes from './routes/files.js';
 import healthRoutes from './routes/health.js';
+import { terminalRoutes } from './routes/terminal.js';
+import { terminalService } from './services/terminalService.js';
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 const PORT = parseInt(process.env.PORT || '5000');
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3434,http://localhost:3000').split(',');
@@ -35,7 +38,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(authMiddleware);
 
-// WebSocket handlers
+// WebSocket handlers - general
 wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket proxy ready' }));
 
@@ -55,12 +58,81 @@ wss.on('connection', (ws) => {
   });
 });
 
+// Terminal WebSocket server on separate path
+const terminalWss = new WebSocketServer({ server, path: '/ws/terminal' });
+
+terminalWss.on('connection', (ws, req) => {
+  const parsed = new URL(req.url || '', 'http://localhost');
+  const sessionId = parsed.searchParams.get('sessionId') || '';
+  const token = parsed.searchParams.get('token') || '';
+
+  if (!sessionId || !token) {
+    ws.close(4001, 'Missing sessionId or token');
+    return;
+  }
+
+  const session = terminalService.getSession(sessionId);
+  if (!session) {
+    ws.close(4004, 'Session not found');
+    return;
+  }
+
+  ws.send(JSON.stringify({ type: 'connected', sessionId }));
+
+  const onData = (payload: { sessionId: string; data: string }) => {
+    if (payload.sessionId === sessionId && ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'data', data: payload.data }));
+    }
+  };
+
+  const onClose = (payload: { sessionId: string }) => {
+    if (payload.sessionId === sessionId && ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'closed' }));
+      ws.close();
+    }
+  };
+
+  const onError = (payload: { sessionId: string; error: string }) => {
+    if (payload.sessionId === sessionId && ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'error', error: payload.error }));
+    }
+  };
+
+  terminalService.on('data', onData);
+  terminalService.on('close', onClose);
+  terminalService.on('error', onError);
+
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'input') {
+        terminalService.write(sessionId, msg.data);
+      } else if (msg.type === 'resize') {
+        terminalService.resize(sessionId, msg.cols, msg.rows);
+      }
+    } catch (e) {
+      logger.warn('Invalid terminal WS message');
+    }
+  });
+
+  ws.on('close', () => {
+    terminalService.off('data', onData);
+    terminalService.off('close', onClose);
+    terminalService.off('error', onError);
+  });
+
+  ws.on('error', (err) => {
+    logger.error('Terminal WS error', { error: err.message });
+  });
+});
+
 // Health endpoint (no auth)
 app.use('/health', healthRoutes);
 
 // API routes
 app.use('/api', connectionRoutes);
 app.use('/api', fileRoutes);
+app.use('/api/terminal', terminalRoutes);
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {

@@ -1,12 +1,15 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useStore } from '../store';
 import { apiClient } from '../lib/api';
 import FilePanel from './FilePanel';
-import { PanelLeft, PanelRight, Columns } from 'lucide-react';
+import TerminalPanel from './Terminal';
+import { PanelLeft, PanelRight, Columns, Terminal } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function FileBrowser() {
   const { isConnected, activeConnectionId, setLocalFiles, setRemoteFiles, localPath, remotePath, layoutMode, setLayoutMode, addNotification } = useStore();
+  const [showTerminal, setShowTerminal] = useState(false);
 
   const fetchFiles = useCallback(async (isLocal: boolean) => {
     try {
@@ -33,9 +36,19 @@ export default function FileBrowser() {
     }
   }, [isConnected, activeConnectionId, remotePath]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '`' && e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        setShowTerminal((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
-    <div className="flex-1 w-full flex flex-col overflow-hidden bg-transparent">
+    <div className="flex-1 w-full flex flex-col overflow-hidden bg-transparent relative">
         <div className="flex items-center justify-center p-3 border-b border-white/10 shrink-0">
            <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
               <button 
@@ -82,6 +95,29 @@ export default function FileBrowser() {
                </section>
            )}
         </div>
+
+        {/* Terminal toggle button */}
+        {isConnected && activeConnectionId && (
+          <button
+            onClick={() => setShowTerminal(!showTerminal)}
+            className="fixed bottom-4 right-4 z-40 p-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-full shadow-lg transition-all hover:scale-105"
+            title="Toggle Terminal (Ctrl+`)"
+          >
+            <Terminal size={18} className="text-white" />
+          </button>
+        )}
+
+        {/* Terminal panel */}
+        <AnimatePresence>
+          {showTerminal && isConnected && activeConnectionId && (
+            <div className="absolute bottom-0 left-0 right-0 z-30" style={{ height: '50%', minHeight: '200px' }}>
+              <TerminalPanel
+                connectionId={activeConnectionId}
+                onClose={() => setShowTerminal(false)}
+              />
+            </div>
+          )}
+        </AnimatePresence>
     </div>
   )
 }

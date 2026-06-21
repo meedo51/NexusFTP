@@ -19,12 +19,20 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const queryToken = req.query.token as string | undefined;
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (queryToken) {
+    token = queryToken;
+  }
+
+  if (!token) {
     res.status(401).json({ error: 'Missing or invalid authorization header' });
     return;
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { connectionId: string; username: string };
     req.user = decoded;
