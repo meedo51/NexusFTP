@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Folder, File as FileIcon, HardDrive, Globe, MoreHorizontal, ArrowUp, RefreshCw, Upload, Download, Plus, Trash2, Search } from 'lucide-react';
 import { useStore, FileItem } from '../store';
@@ -32,6 +32,8 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
 
   const [pathInput, setPathInput] = useState(path);
   const [searchQuery, setSearchQuery] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     setPathInput(path);
@@ -62,6 +64,28 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
         console.error('Upload failed', err);
       }
     }
+    onRefresh();
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList) as File[];
+    const cid = isLocal ? 'local' : (activeConnectionId || 'local');
+    setUploading(true);
+    for (const file of files) {
+      try {
+        await apiClient.uploadFile('/files/upload', file, undefined, { id: cid, path });
+      } catch (err: any) {
+        console.error('Upload failed', err);
+      }
+    }
+    setUploading(false);
+    e.target.value = '';
     onRefresh();
   };
 
@@ -240,23 +264,32 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
        
        {/* Actions Bar */}
        <div className="p-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-black/20">
-         <div className="flex items-center gap-1">
-           <button className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
-             <Plus size={16}/> New Folder
-           </button>
-           {selected.length > 0 && (
-             <>
-               <div className="w-px h-4 bg-white/10 mx-2" />
-               <button className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-blue-500/20 transition-colors">
-                 {isLocal ? <Upload size={16}/> : <Download size={16}/>} 
-                 {isLocal ? 'Upload' : 'Download'}
-               </button>
-               <button className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
-                 <Trash2 size={16}/> Delete
-               </button>
-             </>
-           )}
-         </div>
+          <div className="flex items-center gap-1">
+            <button className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+              <Plus size={16}/> New Folder
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-2" />
+            <button
+              onClick={handleUploadClick}
+              disabled={uploading}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+            >
+              <Upload size={16}/> {uploading ? 'Uploading...' : 'Upload'}
+            </button>
+            {selected.length > 0 && (
+              <>
+                <div className="w-px h-4 bg-white/10 mx-2" />
+                {!isLocal && (
+                  <button onClick={() => handleAction('download')} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 hover:text-white hover:bg-blue-500/20 transition-colors">
+                    <Download size={16}/> Download
+                  </button>
+                )}
+                <button onClick={() => handleAction('delete')} className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
+                  <Trash2 size={16}/> Delete
+                </button>
+              </>
+            )}
+          </div>
          <div className="flex bg-white/5 rounded-lg p-1 border border-white/10 ml-auto mr-4">
             <button 
                onClick={() => setViewMode('grid')}
@@ -376,8 +409,16 @@ export default function FilePanel({ isLocal, onRefresh }: { isLocal: boolean, on
          />
        )}
 
-       {isDragging && (
-         <div className="absolute inset-0 z-40 bg-cyan-500/10 border-2 border-cyan-500/50 border-dashed m-4 rounded-2xl flex items-center justify-center backdrop-blur-sm pointer-events-none">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFilePick}
+          className="hidden"
+        />
+
+        {isDragging && (
+          <div className="absolute inset-0 z-40 bg-cyan-500/10 border-2 border-cyan-500/50 border-dashed m-4 rounded-2xl flex items-center justify-center backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-4 bg-black/60 px-8 py-6 rounded-2xl border border-cyan-500/30">
                <div className="w-16 h-16 rounded-full bg-cyan-500/20 flex items-center justify-center">
                   <Upload size={32} className="text-cyan-400" />
